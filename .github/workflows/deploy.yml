@@ -1,3 +1,5 @@
+# GitHub Actions workflow demonstrating environment variables and secrets management
+# Demonstrates: workflow-level and job-level env vars, secrets, environment configurations, and job dependencies
 name: Deployment
 on:
   push:
@@ -5,26 +7,32 @@ on:
       - master
       - dev
 env:
+  # Workflow-level environment variable available to all jobs
   MONGODB_DB_NAME: gha-demo
 jobs:
+  # Job 1: Test - runs tests with database connection
   test:
     env:
+      # Job-level environment variables specific to this test job
       MONGODB_CLUSTER_ADDRESS: cluster0.mc13lb9.mongodb.net
-      MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
-      MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+      MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}  # References a secret stored in GitHub
+      MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}  # References a secret stored in GitHub
       PORT: 8080
-    environment: testing
+    environment: testing  # Uses 'testing' environment configuration from repository settings
     runs-on: ubuntu-latest
     steps:
       - name: Get Code
         uses: actions/checkout@v7
       - name: Cache dependencies
+        # Cache step ID allows checking if cache was hit in next step
         id: cache
         uses: actions/cache@v6
         with:
           path: node_modules
+          # Unique cache key based on package-lock.json
           key: npm-deps-${{ hashFiles('**/package-lock.json') }}
       - name: Install dependencies
+        # Conditional step - only runs if cache was not found (cache-hit != 'true')
         if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci
       - name: Run server
@@ -32,12 +40,15 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Output information
+        # Outputs environment variables for verification
         run: |
           echo "MONGODB_USERNAME: ${{ env.MONGODB_USERNAME }}"
+  # Job 2: Deploy - runs after test job passes
   deploy:
-    needs: test
+    needs: test  # Waits for test job to complete successfully
     runs-on: ubuntu-latest
     steps:
       - name: Output information
-        run: |        
+        # Accesses workflow-level environment variable from deploy job
+        run: |
           echo "MONGODB_DB_NAME: ${{ env.MONGODB_DB_NAME }}"
